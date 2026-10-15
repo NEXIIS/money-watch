@@ -104,8 +104,8 @@ This is the single source of truth for the database architecture. Do not assume 
 > RLS is authenticated-user-only. Anon demo policies and the `user_settings` `Public Access` / `Public Update` policies were removed by `20260219175139_remove_anon_demo_policies.sql` and `20260219175138_secure_user_settings.sql` — do not reintroduce them.
 >
 > **Migration state.** The linked project was originally created outside this
-> pipeline, but `supabase_migrations.schema_migrations` is now in sync: every
-> file in `supabase/migrations/` is recorded and applied. `supabase migration
+> pipeline, but `supabase_migrations.schema_migrations` is now in sync: all 14
+> files in `supabase/migrations/` are recorded and applied. `supabase migration
 > up --linked` works, and it wraps each file in a transaction that rolls back on
 > error — which makes a deliberately-raising migration a safe, zero-pollution
 > way to test write paths. Still verify against the live schema before writing a
@@ -133,7 +133,7 @@ This is the single source of truth for the database architecture. Do not assume 
   and refetches only on success, leaving it open so `LogExpenseModal` can show
   its inline error.
 * **Notifications `markAsRead`:** Optimistic update in local state (`is_read: true`), immediate Supabase update, and revert to `is_read: false` on error. The notification **stays in the list** when read — it is not removed. (The previously documented 40-second delayed save is **no longer in the code** — if you reintroduce it, flush on `beforeunload`/visibility change so intent isn't lost.) Covered by `src/test/useWallet.test.ts`.
-* **Dynamic Limits — NOT YET BUILT:** `user_settings` is now per-user and RLS-locked (`20260219175138_secure_user_settings.sql`) and carries the daily/weekly/monthly limit and savings-goal columns, but **no UI writes to it and no code reads it**. `SettingsView.tsx` currently only edits `username` and signs out. Treat this as a pending feature, not existing behavior.
+* **Dynamic Limits — NOT YET BUILT (RPCs fixed):** `user_settings` is now per-user and RLS-locked, every new signup gets a settings row via `handle_new_user`. The daily/weekly/monthly limit and savings-goal columns exist, but **no UI writes to them and no code reads them**. `SettingsView.tsx` currently only edits `username` and signs out. The backing RPCs now count outflows only (`type IN ('expense','withdrawal')`) — they were summing signed amounts and netting deposits against spending. Treat the UI as pending, not the RPCs.
 * **Time-Travel Math — NOT YET BUILT:** daily/weekly/monthly bucketing of transactions against `user_settings` limits is documented intent, not implemented. Do not assume it runs.
 * **Known gaps:** there is no UI to add funds (new users start at ₦0 and every
   action is blocked), and no category CRUD despite `LogExpenseModal` telling the
