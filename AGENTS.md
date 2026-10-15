@@ -101,15 +101,41 @@ This is the single source of truth for the database architecture. Do not assume 
 > flow double-counts. None of the bank-sync RPCs are called by the frontend
 > yet; treat them as the not-yet-wired "bank alerts" path.
 >
+> **Bank reconciliation (added by `20261004100000`–`20261004100700`).**
+> `users.current_balance == sum(active bank_accounts.ledger_balance)` is
+> asserted by every money RPC. The bank figure *guides* the ledger rather than
+> overwriting it: `apply_reconciliation` writes one visible `reconciliation`
+> transaction for `drift = reported - ledger` and moves both balances by exactly
+> that amount, leaving `savings_balance` untouched. Three entry points, one core:
+> * `reconcile_bank_account(uuid, numeric, timestamptz)` — the Bank Accounts
+>   panel; caller must own the account.
+> * `apply_reconciliation(uuid, uuid, numeric, timestamptz)` — internal core.
+>   Guarded by `auth.role() = 'service_role' OR auth.uid() = p_user_id`.
+> * `reconcile_bank_account_by_email(text, numeric, timestamptz, text)` —
+>   **make.com only**, `service_role` only. Resolves email → user → account
+>   server-side and returns a `status` string instead of raising, so Make can
+>   branch instead of showing a red run.
+>
+> **Why the email variant exists:** a project API key carries no `jwt.sub`, so
+> `auth.uid()` is `NULL` for both the `anon` and `service_role` keys — which
+> means the `auth.uid() is distinct from p_user_id` guard used by the older RPCs
+> silently rejected *every* Make call while returning HTTP 200. Do not "simplify"
+> this back into a single RPC, and never hardcode a `p_user_id` in a scenario
+> again; the alert's recipient address is the user key. See
+> `supabase/docs/make_migration.md`.
+>
 > RLS is authenticated-user-only. Anon demo policies and the `user_settings` `Public Access` / `Public Update` policies were removed by `20260219175139_remove_anon_demo_policies.sql` and `20260219175138_secure_user_settings.sql` — do not reintroduce them.
 >
 > **Migration state.** The linked project was originally created outside this
-> pipeline, but `supabase_migrations.schema_migrations` is now in sync: all 15
+> pipeline, but `supabase_migrations.schema_migrations` is now in sync: all 23
 > files in `supabase/migrations/` are recorded and applied. `supabase migration
 > up --linked` works, and it wraps each file in a transaction that rolls back on
 > error — which makes a deliberately-raising migration a safe, zero-pollution
-> way to test write paths. Still verify against the live schema before writing a
-> new migration (`supabase db pull`, or the supabase MCP `execute_sql`).
+> way to test write paths (impersonate with `set_config('request.jwt.claim.role',
+> 'service_role', true)` plus `'request.jwt.claim.sub'`; the MCP `execute_sql`
+> role is `supabase_read_only_user` and has no EXECUTE on the money RPCs). Still
+> verify against the live schema before writing a new migration (`supabase db
+> pull`, or the supabase MCP `execute_sql`).
 
 ## Key Logic & UX Rules
 * **Show the business date, not the insert time.** `TransactionList` renders

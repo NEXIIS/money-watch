@@ -1,13 +1,12 @@
 {
-  "name": "Money-Watch — Bank Reconciliation (multi-user, multi-bank)",
-  "notes": "Generated from money-watch supabase/docs — the vault-destroying overwrite path (sync_bank_to_app with p_cleared_balance -> current_balance) is *not* used. Ledger moves by drift (reported - ledger) and a visible `reconciliation` row is written. Per-user bank_accounts are the unit: see docs/make_migration.md. Validate against 20261004100000..100500 before wiring live funds. Connection IDs below are YOUR existing ones (5184148 = google-email on gs35421gamer, 5259937 = supabase Money-Watch) — re-use yours, do not paste a snapshot of the service key.",
+  "name": "Money-Watch — Bank Reconciliation",
   "flow": [
     {
       "id": 43,
       "module": "google-email:triggerWatchNewEmails",
       "version": 4,
       "parameters": {
-        "q": "from:(firstbank.com OR gtbank.com OR uba-group.com OR accessbankplc.com OR zenithbank.com) subject:(\"Debit\" OR \"Credit\" OR \"Alert\") has:attachment OR has:link",
+        "q": "from:(firstbank.com OR firstbanknigeria.com OR gtbank.com OR uba-group.com OR accessbankplc.com OR zenithbank.com OR wema-bank.com OR fcnbank.com OR sterlingbank.com OR stanbicibigbank.com) subject:(debit OR credit OR alert OR \"account\")",
         "limit": 15,
         "format": "full",
         "markSeen": true,
@@ -16,122 +15,508 @@
       },
       "mapper": {},
       "metadata": {
-        "designer": { "x": 18, "y": 310 },
+        "designer": {
+          "x": 18,
+          "y": 310
+        },
         "restore": {
           "parameters": {
+            "format": {
+              "label": "Full content"
+            },
+            "filterType": {
+              "label": "Gmail filter"
+            },
             "__IMTCONN__": {
-              "data": { "scoped": "true", "connection": "google-email" },
-              "label": "My Gmail connection — multiplex per user: each friend adds their own google-email connection with a distinct label (bank_accounts.label), kept as a scenario note"
+              "data": {
+                "scoped": "true",
+                "connection": "google-email"
+              },
+              "label": "My Gmail connection (gs35421gamer@gmail.com)"
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:google-email",
+            "label": "Connection",
+            "required": true
+          },
+          {
+            "name": "filterType",
+            "type": "select",
+            "label": "Filter type",
+            "required": true,
+            "validate": {
+              "enum": [
+                "simpleSearch",
+                "gmailSearch"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "type": "select",
+            "label": "Content format",
+            "required": true,
+            "validate": {
+              "enum": [
+                "full",
+                "raw",
+                "metadata",
+                "minimal"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "type": "text",
+            "label": "Query"
+          },
+          {
+            "name": "markSeen",
+            "type": "boolean",
+            "label": "Mark email message(s) as read when fetched"
+          },
+          {
+            "name": "limit",
+            "type": "uinteger",
+            "label": "Limit",
+            "required": true,
+            "validate": {
+              "max": 500
+            }
+          }
+        ],
+        "interface": [
+          {
+            "name": "id",
+            "type": "text",
+            "label": "Message ID"
+          },
+          {
+            "name": "threadId",
+            "type": "text",
+            "label": "Thread ID"
+          },
+          {
+            "name": "internalDate",
+            "type": "date",
+            "label": "Date"
+          },
+          {
+            "name": "subject",
+            "type": "text",
+            "label": "Subject",
+            "condition": true
+          },
+          {
+            "name": "fromName",
+            "type": "text",
+            "label": "From (name)",
+            "condition": true
+          },
+          {
+            "name": "fromEmail",
+            "type": "text",
+            "label": "From (email)",
+            "condition": true
+          },
+          {
+            "name": "to",
+            "spec": {
+              "spec": [
+                {
+                  "name": "name",
+                  "type": "text",
+                  "label": "Name"
+                },
+                {
+                  "name": "email",
+                  "type": "email",
+                  "label": "Email"
+                }
+              ],
+              "type": "collection"
+            },
+            "type": "array",
+            "label": "To",
+            "condition": true
+          },
+          {
+            "name": "cc",
+            "spec": [
+              {
+                "name": "email",
+                "type": "email",
+                "label": "Email"
+              },
+              {
+                "name": "name",
+                "type": "text",
+                "label": "Name"
+              }
+            ],
+            "type": "array",
+            "label": "CC",
+            "condition": true
+          },
+          {
+            "name": "bcc",
+            "spec": [
+              {
+                "name": "email",
+                "type": "email",
+                "label": "Email"
+              },
+              {
+                "name": "name",
+                "type": "text",
+                "label": "Name"
+              }
+            ],
+            "type": "array",
+            "label": "BCC",
+            "condition": true
+          },
+          {
+            "name": "snippet",
+            "type": "text",
+            "label": "Snippet"
+          },
+          {
+            "name": "fullTextBody",
+            "type": "text",
+            "label": "Full text body",
+            "condition": true
+          },
+          {
+            "name": "htmlBody",
+            "type": "text",
+            "label": "HTML body",
+            "condition": true
+          },
+          {
+            "name": "hasAttachment",
+            "type": "boolean",
+            "label": "Has attachment",
+            "condition": true
+          },
+          {
+            "name": "hasMedia",
+            "type": "boolean",
+            "label": "Has media",
+            "condition": true
+          },
+          {
+            "name": "sysFolders",
+            "spec": [
+              {
+                "name": "id",
+                "type": "text",
+                "label": "System folder ID"
+              },
+              {
+                "name": "name",
+                "type": "text",
+                "label": "System folder name"
+              }
+            ],
+            "type": "array",
+            "label": "System folders"
+          },
+          {
+            "name": "categoryFolders",
+            "spec": [
+              {
+                "name": "id",
+                "type": "text",
+                "label": "Category folder ID"
+              },
+              {
+                "name": "name",
+                "type": "text",
+                "label": "Category folder name"
+              }
+            ],
+            "type": "array",
+            "label": "Category folders"
+          },
+          {
+            "name": "userLabelFolders",
+            "spec": [
+              {
+                "name": "id",
+                "type": "text",
+                "label": "User label folder ID"
+              },
+              {
+                "name": "name",
+                "type": "text",
+                "label": "User label folder name"
+              }
+            ],
+            "type": "array",
+            "label": "User label folders"
+          },
+          {
+            "name": "labelIds",
+            "spec": {
+              "type": "text"
+            },
+            "type": "array",
+            "label": "Message folder IDs"
+          },
+          {
+            "name": "headers",
+            "spec": {
+              "type": "text"
+            },
+            "type": "collection",
+            "label": "Headers",
+            "condition": true
+          },
+          {
+            "name": "sizeEstimate",
+            "type": "number",
+            "label": "Size estimate"
+          },
+          {
+            "name": "historyId",
+            "type": "text",
+            "label": "History ID"
+          }
+        ]
       }
     },
     {
-      "id": 45,
-      "module": "builtin:BasicRouter",
+      "id": 53,
+      "module": "regexp:Parser",
       "version": 1,
-      "mapper": null,
-      "routes": [
-        {
-          "flow": [
-            {
-              "id": 53,
-              "module": "regexp:Parser",
-              "version": 1,
-              "parameters": {
-                "global": false,
-                "pattern": "Amount[:\\s]+[A-Z]{0,3}\\s*([\\d,]+\\.\\d{2}).*?(?:Cleared|Available|Avl|Ledger)[\\s_]*Bal(?:ance)?[:\\s]*[A-Z]{0,3}\\s*([\\d,]+\\.\\d{2})",
-                "multiline": true,
-                "sensitive": false,
-                "singleline": true,
-                "continueWhenNoRes": false
-              },
-              "filter": {
-                "name": "Is debit",
-                "conditions": [[{ "a": "{{43.subject}}", "b": "Debit", "o": "text:contain:ci" }]]
-              },
-              "mapper": { "text": "{{43.fullTextBody}}" },
-              "metadata": {
-                "designer": { "x": 617, "y": 62 },
-                "notes": "Synonym table: GTB says 'Available Bal', UBA 'Avl. Bal', Zenith 'Ledger Balance'. The bank is now authoritative but VISIBLY: p_reported_balance is what the bank reported, drift is (reported - ledger). The old Amount ($1) field is no longer sent — see module 56. Token family is parseNumber({{53.$1}}; \".\"; \",\"), not the backtick form ( Make v2 quirk — use $1 per module)."
-              }
-            },
-            {
-              "id": 56,
-              "module": "supabase:makeAnApiCall",
-              "version": 1,
-              "parameters": { "__IMTCONN__": 5259937 },
-              "mapper": {
-                "url": "/rest/v1/rpc/reconcile_bank_account",
-                "method": "POST",
-                "headers": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": "{\n  \"p_account_id\": \"{{ifempty(lookup.`account_id`; \\\"UNRESOLVED\\\"))}}\",\n  \"p_reported_balance\": {{parseNumber(53.$2; \".\"; \",\")}}\n}",
-                "qs": []
-              },
-              "metadata": {
-                "designer": { "x": 918, "y": 160 },
-                "notes": "Pre-step required (not in this snapshot): a Supabase 'Make an API Call' that does GET /rest/v1/bank_accounts?label=eq.Primary&select=id&user_id=eq.{{43.__IMTCONN__}}>auth.uid mapping — Make multiplexes per Gmail connection: each user has a dedicated connection with a scenario-level label (bank_accounts.label), so no p_user_id is hardcoded. Result alias is 'lookup'. The stale body was sync_bank_to_app with p_user_id cff8115a... and p_cleared_balance. If the lookup returns 0 rows, branch to a no-op so a variant-format email does not emit current_balance = p_cleared_balance (that was the unsafe fallback)."
-              }
-            }
-          ]
+      "parameters": {
+        "global": false,
+        "pattern": "(?:Cleared|Available|Avl|Ledger|Book|Current)\\s*\\.?\\s*Bal(?:ance)?[:\\s]*[A-Z\u20a6]{0,3}\\s*([\\d,]+\\.\\d{2})",
+        "multiline": true,
+        "sensitive": false,
+        "singleline": true,
+        "continueWhenNoRes": false
+      },
+      "mapper": {
+        "text": "{{43.fullTextBody}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 400,
+          "y": 310
         },
-        {
-          "flow": [
-            {
-              "id": 54,
-              "module": "regexp:Parser",
-              "version": 1,
-              "parameters": {
-                "global": false,
-                "pattern": "Amount[:\\s]+[A-Z]{0,3}\\s*([\\d,]+\\.\\d{2}).*?(?:Cleared|Available|Avl|Ledger)[\\s_]*Bal(?:ance)?[:\\s]*[A-Z]{0,3}\\s*([\\d,]+\\.\\d{2})",
-                "multiline": false,
-                "sensitive": false,
-                "singleline": true,
-                "continueWhenNoRes": false
-              },
-              "filter": {
-                "name": "Is Credit",
-                "conditions": [[{ "a": "{{43.subject}}", "b": "Credit", "o": "text:contain:ci" }]]
-              },
-              "mapper": { "text": "{{43.fullTextBody}}" },
-              "metadata": {
-                "designer": { "x": 622, "y": 527 },
-                "notes": "Same synonym branch as Debit. In make.com the `sensitive` toggle is true by default — set to false so 'credit' matches 'CREDIT' across banks."
-              }
+        "restore": {},
+        "parameters": [
+          {
+            "name": "pattern",
+            "type": "text",
+            "label": "Pattern",
+            "required": true
+          },
+          {
+            "name": "global",
+            "type": "boolean",
+            "label": "Global match",
+            "required": true
+          },
+          {
+            "name": "sensitive",
+            "type": "boolean",
+            "label": "Case sensitive",
+            "required": true
+          },
+          {
+            "name": "multiline",
+            "type": "boolean",
+            "label": "Multiline",
+            "required": true
+          },
+          {
+            "name": "singleline",
+            "type": "boolean",
+            "label": "Singleline",
+            "required": true
+          },
+          {
+            "name": "continueWhenNoRes",
+            "type": "boolean",
+            "label": "Continue the execution of the route even if the module finds no matches",
+            "required": true
+          }
+        ],
+        "expect": [
+          {
+            "name": "text",
+            "type": "text",
+            "label": "Text"
+          }
+        ],
+        "interface": [
+          {
+            "name": "$1",
+            "type": "text",
+            "label": "$1"
+          }
+        ]
+      }
+    },
+    {
+      "id": 56,
+      "module": "supabase:makeAnApiCall",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": 5259937
+      },
+      "mapper": {
+        "url": "/rest/v1/rpc/reconcile_bank_account_by_email",
+        "method": "POST",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": "{\n  \"p_email\": \"{{coalesce(43.to[1].email; get(43.headers; \"Delivered-To\"); \"UNRESOLVED\")}}\",\n  \"p_reported_at\": \"{{43.internalDate}}\",\n  \"p_reported_balance\": {{parseNumber(53.`$1`; \".\"; \",\")}}\n}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 750,
+          "y": 310
+        },
+        "restore": {
+          "expect": {
+            "qs": {
+              "mode": "chose"
             },
-            {
-              "id": 58,
-              "module": "supabase:makeAnApiCall",
-              "version": 1,
-              "parameters": { "__IMTCONN__": 5259937 },
-              "mapper": {
-                "url": "/rest/v1/rpc/reconcile_bank_account",
-                "method": "POST",
-                "headers": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": "{\n  \"p_account_id\": \"{{ifempty(lookup.`account_id`; \\\"UNRESOLVED\\\"))}}\",\n  \"p_reported_balance\": {{parseNumber(54.$2; \".\"; \",\")}}\n}",
-                "qs": []
-              },
-              "metadata": {
-                "designer": { "x": 918, "y": 460 },
-                "notes": "Credit was load-bearing: your old scenario's filter was text:contain:ci but the parser path was sensitive:true, so a 'CREDIT' subject could route Debit:true / Credit:false and parse as Debit. Kept both routes but made the invariant explicit so Credit is not a fall-through."
-              }
+            "method": {
+              "mode": "chose",
+              "label": "POST"
+            },
+            "headers": {
+              "mode": "chose",
+              "items": [
+                null
+              ],
+              "collapsed": true
             }
-          ]
-        }
-      ]
+          },
+          "parameters": {
+            "__IMTCONN__": {
+              "data": {
+                "scoped": "true",
+                "connection": "supabase"
+              },
+              "label": "Money-Watch"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:supabase",
+            "label": "Connection",
+            "required": true
+          }
+        ],
+        "expect": [
+          {
+            "name": "url",
+            "type": "text",
+            "label": "URL",
+            "required": true
+          },
+          {
+            "name": "method",
+            "type": "select",
+            "label": "Method",
+            "required": true,
+            "validate": {
+              "enum": [
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE"
+              ]
+            }
+          },
+          {
+            "name": "headers",
+            "spec": {
+              "name": "value",
+              "spec": [
+                {
+                  "name": "key",
+                  "type": "text",
+                  "label": "Key"
+                },
+                {
+                  "name": "value",
+                  "type": "text",
+                  "label": "Value"
+                }
+              ],
+              "type": "collection",
+              "label": "Header"
+            },
+            "type": "array",
+            "label": "Headers"
+          },
+          {
+            "name": "qs",
+            "spec": {
+              "name": "value",
+              "spec": [
+                {
+                  "name": "key",
+                  "type": "text",
+                  "label": "Key"
+                },
+                {
+                  "name": "value",
+                  "type": "text",
+                  "label": "Value"
+                }
+              ],
+              "type": "collection",
+              "label": "Parameter"
+            },
+            "type": "array",
+            "label": "Query String"
+          },
+          {
+            "name": "body",
+            "type": "any",
+            "label": "Body"
+          }
+        ]
+      }
     }
   ],
   "metadata": {
+    "instant": false,
     "version": 1,
     "scenario": {
-      "roundtrips": 1, "maxErrors": 3, "autoCommit": true,
-      "autoCommitTriggerLast": true, "sequential": false,
-      "zone": "eu1.make.com"
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "slots": null,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
     },
-    "importNotes": [
-      "Import: make.com -> Scenarios -> ⋮ -> Import blueprint. It will prompt to re-bind __IMTCONN__ 5184148 and 5259937 to your workspace. Do not paste the service key into the blueprint file; it is Make-managed.",
-      "Required before first live run: run supabase/migrations/ 20261004100000..100500 on the linked project, then smoke one Debit and one Credit Gmail alert and verify the dashboard's reconciliation badge (not the old overwrite's bank_balance-only delta)."
-    ]
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com",
+    "notes": []
   }
 }
