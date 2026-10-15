@@ -4,6 +4,8 @@ import type { BankAccount } from '../types';
 
 interface BankAccountsPanelProps {
   accounts: BankAccount[];
+  /** Deep link from the ₦0 onboarding banner: land with the form already open. */
+  initiallyOpenAdd?: boolean;
   onAdd: (label: string, openingBalance: number, bankName?: string) => Promise<boolean>;
   onRemove: (accountId: string) => Promise<boolean>;
   onReconcile: (accountId: string, reportedBalance: number) => Promise<unknown>;
@@ -21,11 +23,12 @@ const naira = (n: number) =>
  */
 export function BankAccountsPanel({
   accounts,
+  initiallyOpenAdd = false,
   onAdd,
   onRemove,
   onReconcile,
 }: BankAccountsPanelProps) {
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState(initiallyOpenAdd);
   const [label, setLabel] = useState('');
   const [bankName, setBankName] = useState('');
   const [opening, setOpening] = useState('');

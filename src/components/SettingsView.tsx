@@ -12,6 +12,7 @@ interface SettingsViewProps {
   wallet: UserWallet | null;
   onRefetch: () => void; // So we can tell App.tsx to reload the new username
   bankAccounts: BankAccount[];
+  autoOpenAddAccount?: boolean;
   onAddBankAccount: (label: string, openingBalance: number, bankName?: string) => Promise<boolean>;
   onRemoveBankAccount: (accountId: string) => Promise<boolean>;
   onReconcileAccount: (accountId: string, reportedBalance: number) => Promise<ReconcileResult>;
@@ -23,6 +24,7 @@ export function SettingsView({
   wallet,
   onRefetch,
   bankAccounts,
+  autoOpenAddAccount = false,
   onAddBankAccount,
   onRemoveBankAccount,
   onReconcileAccount,
@@ -116,6 +118,7 @@ export function SettingsView({
       {/* Bank Accounts */}
       <BankAccountsPanel
         accounts={bankAccounts}
+        initiallyOpenAdd={autoOpenAddAccount}
         onAdd={onAddBankAccount}
         onRemove={onRemoveBankAccount}
         onReconcile={onReconcileAccount}

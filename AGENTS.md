@@ -92,14 +92,19 @@ This is the single source of truth for the database architecture. Do not assume 
 > table in `useWallet`, you must `alter publication supabase_realtime add table`
 > or the subscription will silently never fire.
 >
-> **Two balance models coexist — don't mix them.** The app's own RPCs
+> **The overwrite path is `sync_bank_to_app`, and it is a standing hazard.**
+> It **overwrites** `current_balance` from the bank's cleared balance
+> (`p_cleared_balance - savings_balance`) and writes `bank_balance`, ignoring
+> `bank_accounts` entirely — so mixing it with the app's own RPCs
 > (`move_to_vault`, `withdraw_from_vault`, `log_expense`, `edit_transaction`,
-> `delete_transaction`) mutate `current_balance` incrementally. The bank-sync
-> RPCs (`sync_bank_to_app`, the 5-arg `add_funds`/`subtract_funds`) instead
-> **overwrite** `current_balance` from the bank's cleared balance
-> (`p_balance - savings_balance`) and write `bank_balance`. Mixing them in one
-> flow double-counts. None of the bank-sync RPCs are called by the frontend
-> yet; treat them as the not-yet-wired "bank alerts" path.
+> `delete_transaction`) both double-counts and destroys the vault. Nothing in
+> the frontend calls it. Its former companions `add_funds`/`subtract_funds`
+> were **deleted** by `20261004100800_drop_dead_fund_rpcs.sql`: all five
+> definitions moved `current_balance` without touching
+> `bank_accounts.ledger_balance`, so calling any of them broke the invariant
+> below and the next reconciliation would have "corrected" a number that was
+> never wrong. Add money with `add_bank_account`, correct it with
+> `reconcile_bank_account`. Do not reintroduce either function.
 >
 > **Bank reconciliation (added by `20261004100000`–`20261004100700`).**
 > `users.current_balance == sum(active bank_accounts.ledger_balance)` is
@@ -127,7 +132,7 @@ This is the single source of truth for the database architecture. Do not assume 
 > RLS is authenticated-user-only. Anon demo policies and the `user_settings` `Public Access` / `Public Update` policies were removed by `20260219175139_remove_anon_demo_policies.sql` and `20260219175138_secure_user_settings.sql` — do not reintroduce them.
 >
 > **Migration state.** The linked project was originally created outside this
-> pipeline, but `supabase_migrations.schema_migrations` is now in sync: all 23
+> pipeline, but `supabase_migrations.schema_migrations` is now in sync: all 24
 > files in `supabase/migrations/` are recorded and applied. `supabase migration
 > up --linked` works, and it wraps each file in a transaction that rolls back on
 > error — which makes a deliberately-raising migration a safe, zero-pollution
@@ -161,10 +166,17 @@ This is the single source of truth for the database architecture. Do not assume 
 * **Notifications `markAsRead`:** Optimistic update in local state (`is_read: true`), immediate Supabase update, and revert to `is_read: false` on error. The notification **stays in the list** when read — it is not removed. (The previously documented 40-second delayed save is **no longer in the code** — if you reintroduce it, flush on `beforeunload`/visibility change so intent isn't lost.) Covered by `src/test/useWallet.test.ts`.
 * **Dynamic Limits — NOT YET BUILT (RPCs fixed):** `user_settings` is now per-user and RLS-locked, every new signup gets a settings row via `handle_new_user`. The daily/weekly/monthly limit and savings-goal columns exist, but **no UI writes to them and no code reads them**. `SettingsView.tsx` currently only edits `username` and signs out. The backing RPCs now count outflows only (`type IN ('expense','withdrawal')`) — they were summing signed amounts and netting deposits against spending. Treat the UI as pending, not the RPCs.
 * **Time-Travel Math — NOT YET BUILT:** daily/weekly/monthly bucketing of transactions against `user_settings` limits is documented intent, not implemented. Do not assume it runs.
-* **Known gaps:** there is no UI to add funds (new users start at ₦0 and every
-  action is blocked), and no category CRUD despite `LogExpenseModal` telling the
-  user to "Create one first if empty!". Transaction history is capped at 5 rows
-  in the list and 100 for the chart; session history at 3.
+* **Known gaps:** there is no category CRUD despite `LogExpenseModal`
+  telling the user to "Create one first if empty!". Transaction history is
+  capped at 5 rows in the list and 100 for the chart; session history at 3.
+* **Adding funds happens through a bank account, not a separate button.**
+  A new user has no account, ₦0 balance and ₦0 vault, so every money RPC refuses
+  (`log_expense` answers `"Insufficient total funds (Main + Vault)."`). The
+  first-added `bank_accounts` row adopts its opening balance as the starting
+  point — that *is* the add-funds UI, and `OnboardingBanner.tsx` exists purely to
+  route a ₦0 user into it (`bankAccounts.length === 0`, deep-links to
+  `BankAccountsPanel` with `initiallyOpenAdd`). It is deliberately not
+  dismissible: it disappears when an account exists.
 
 ## Important Notes for AI Assistants
 * Always refer to the app as **Money-Watch**, not "FinTrack" or a generic fintech app.

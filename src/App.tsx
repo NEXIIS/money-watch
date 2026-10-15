@@ -15,6 +15,7 @@ import { Auth } from './components/Auth';
 import { Toaster } from 'react-hot-toast';
 import { ExpenseChart } from './components/ExpenseChart';
 import { SettingsView } from './components/SettingsView';
+import { OnboardingBanner } from './components/OnboardingBanner';
 import toast from 'react-hot-toast';
 import type { Session } from '@supabase/supabase-js';
 
@@ -48,6 +49,15 @@ export default function App() {
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+
+  // Set by the onboarding banner: jump to Settings with the add-account form
+  // already open, so a ₦0 user never has to hunt for the one action that helps.
+  const [autoOpenAddAccount, setAutoOpenAddAccount] = useState(false);
+
+  const handleStartOnboarding = () => {
+    setAutoOpenAddAccount(true);
+    setCurrentView('settings');
+  };
 
   const handleOpenSession = () => {
     if (activeSession) {
@@ -160,17 +170,25 @@ export default function App() {
 
         {currentView === 'settings' ? (
           <SettingsView 
-            onClose={() => setCurrentView('dashboard')} 
+            onClose={() => {
+              setCurrentView('dashboard');
+              setAutoOpenAddAccount(false);
+            }} 
             session={session} 
             wallet={wallet} 
             onRefetch={refetch}
             bankAccounts={bankAccounts}
+            autoOpenAddAccount={autoOpenAddAccount}
             onAddBankAccount={addBankAccount}
             onRemoveBankAccount={removeBankAccount}
             onReconcileAccount={reconcileAccount}
           />
         ) : (
           <main className="space-y-4">
+            {bankAccounts.length === 0 && (
+              <OnboardingBanner onAddBankAccount={handleStartOnboarding} />
+            )}
+
             <BalanceCard
               balance={availableBalance}
               onStartSession={handleOpenSession}
