@@ -104,7 +104,7 @@ This is the single source of truth for the database architecture. Do not assume 
 > RLS is authenticated-user-only. Anon demo policies and the `user_settings` `Public Access` / `Public Update` policies were removed by `20260219175139_remove_anon_demo_policies.sql` and `20260219175138_secure_user_settings.sql` — do not reintroduce them.
 >
 > **Migration state.** The linked project was originally created outside this
-> pipeline, but `supabase_migrations.schema_migrations` is now in sync: all 14
+> pipeline, but `supabase_migrations.schema_migrations` is now in sync: all 15
 > files in `supabase/migrations/` are recorded and applied. `supabase migration
 > up --linked` works, and it wraps each file in a transaction that rolls back on
 > error — which makes a deliberately-raising migration a safe, zero-pollution
