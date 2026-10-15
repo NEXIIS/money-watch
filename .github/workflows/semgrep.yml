@@ -1,0 +1,62 @@
+# Semgrep static analysis — runs on every push/PR
+# Results appear in GitHub → Security → Code scanning alerts
+# Free for public repos; private repos: 100 scans/mo on free tier
+
+name: Semgrep
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  security-events: write  # needed for SARIF upload
+
+jobs:
+  semgrep:
+    name: Scan
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        id: semgrep
+        run: |
+          semgrep scan \
+            --config=auto \
+            --sarif=semgrep.sarif \
+            --json=semgrep.json \
+            --error \
+            .
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Print summary (JSON)
+        if: always()
+        run: |
+          if [ -f semgrep.json ]; then
+            echo "=== Semgrep findings ==="
+            cat semgrep.json | jq '.results | length' 2>/dev/null || echo "No JSON output"
+          fi
+
+      - name: Fail on high/critical (optional)
+        # Uncomment to block merges on high-severity findings:
+        # run: |
+        #   if [ -f semgrep.json ]; then
+        #     HIGH=$(cat semgrep.json | jq '[.results[] | select(.extra.severity=="ERROR")] | length')
+        #     if [ "$HIGH" -gt 0 ]; then
+        #       echo "Found $HIGH high/critical issues"
+        #       exit 1
+        #     fi
+        #   fi
+        run: echo "Scan complete — check Security tab for results"

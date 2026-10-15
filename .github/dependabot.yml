@@ -1,0 +1,93 @@
+# Dependabot — automated dependency updates & security patches
+# Free on GitHub (public & private repos)
+# PRs appear in "Pull requests" tab; merge manually or enable auto-merge
+
+version: 2
+updates:
+  # npm (package.json / package-lock.json)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    # Group related deps into fewer PRs
+    groups:
+      dev-dependencies:
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier*"
+          - "vite*"
+          - "vitest*"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "typescript*"
+        update-types: ["minor", "patch"]
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "react-dom*"
+          - "@vitejs/plugin-react*"
+        update-types: ["minor", "patch"]
+      ui-libraries:
+        patterns:
+          - "lucide-react"
+          - "tailwindcss*"
+          - "@tailwindcss/*"
+          - "clsx"
+          - "clsx"
+          - "class-variance-authority"
+          - "tailwind-merge"
+        update-types: ["minor", "patch"]
+      supabase:
+        patterns:
+          - "@supabase/*"
+          - "supabase"
+        update-types: ["minor", "patch"]
+    # Security patches ASAP (overrides schedule)
+    allow:
+      - dependency-type: "direct"
+        update-type: "security"
+      - dependency-type: "indirect"
+        update-type: "security"
+    # Ignore major version bumps (breaking changes) — review manually
+    ignore:
+      - dependency-name: "*"
+        update-type: "version-update:semver-major"
+    # Limit open PRs to avoid noise
+    open-pull-requests-limit: 10
+    # Labels for filtering
+    labels:
+      - "dependencies"
+      - "npm"
+    # Commit message prefix
+    commit-message:
+      prefix: "chore(deps):"
+      prefix-development: "chore(deps-dev):"
+      include: "scope"
+
+  # GitHub Actions (workflows/*.yml)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "UTC"
+    allow:
+      - dependency-type: "direct"
+        update-type: "security"
+      - dependency-type: "indirect"
+        update-type: "security"
+    ignore:
+      - dependency-name: "*"
+        update-type: "version-update:semver-major"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci(deps):"
+      include: "scope"
