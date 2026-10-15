@@ -69,17 +69,46 @@ bank sent it rather than when Make happened to run.
 If your bank's alerts arrive at an address that is not your Money-Watch email,
 change the `p_email` field once — it is a single mapping, no code change.
 
+## Status: applied to scenario 4444309 (verified, inactive)
+
+The scenario was updated through `PATCH /api/v2/scenarios/4444309`, not through
+the UI import dialog. Blueprint `version 54`.
+
+Importing a blueprint by hand did **not** work on this workspace — the import
+raised a warning and left the stored blueprint untouched (still `version 52`,
+`last_edit 2026-03-14`, `usedPackages` still listing `builtin`). If you ever see
+an import warning, the scenario did **not** change. Verify with
+`GET /api/v2/scenarios/{id}/blueprint`, never by looking at the canvas.
+
+What was verified, and how:
+
+| Check | Method | Result |
+|---|---|---|
+| RPC reachable over real HTTP | `POST /rest/v1/rpc/…` with the `service_role` key | `drift:0, reconciled:false` |
+| `service_role` reached from **make** | one-module throwaway scenario on connection `5259937`, run once, then deleted | execution `status=1`, and `bank_accounts.reported_at` was stamped inside the execution window |
+| Connection key type | `GET /connections/5259937` | metadata is `null`, so this was proven by the stamp above, not read from config |
+| Regex against bank formats | 10 synthetic alert bodies | see below |
+| No money moved | `transactions` count before/after | 32 → 32, 0 `reconciliation` rows |
+
+The parse harness caught one real bug. With `global:false` make takes the **first**
+match, so an alert containing `Previous Ledger Balance: 50,000.00` before
+`Ledger Balance: 24,500.00` returned the stale figure — a ₦25,500 false drift
+straight into the ledger. The pattern now carries negative lookbehind for
+`Previous|Opening|Closing|Start|End`, and returns `24,500.00` for both orderings.
+
 ## Setup
 
 1. **The Supabase connection must hold the `service_role` key.** Settings →
-   Connections → Money-Watch → edit → API key → `service_role`. With the `anon`
-   key every call returns `{"status": "forbidden"}`. This is a server-side key:
-   it never reaches the browser, and make.com stores it for you.
+   Connections → Money-Watch → edit → API key → `service_role`. Yours already
+   does — proven by the stamp test above. With the `anon` key PostgREST answers
+   `401` before the RPC is ever entered.
 2. Import `make_scenario.blueprint.json`: Scenarios → ⋮ → Import blueprint.
+   (Use this only for a fresh scenario; 4444309 is already patched.)
 3. Re-bind `__IMTCONN__` on both modules when prompted (`5184148` = your Gmail,
    `5259937` = Supabase). Connection ids are workspace-scoped, so they will not
-   survive the import.
-4. **Turn the old scenario off.** Both write to the same ledger.
+   survive an import.
+4. **The scenario is currently inactive.** Turn it on when you are ready for real
+   alerts. The Gmail trigger only polls while active.
 
 ## Reading the result
 

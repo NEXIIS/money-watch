@@ -296,7 +296,7 @@
       "version": 1,
       "parameters": {
         "global": false,
-        "pattern": "(?:Cleared|Available|Avl|Ledger|Book|Current)\\s*\\.?\\s*Bal(?:ance)?[:\\s]*[A-Z\u20a6]{0,3}\\s*([\\d,]+\\.\\d{2})",
+        "pattern": "(?:^|[^\\w])(?<!Previous\\s)(?<!Opening\\s)(?<!Closing\\s)(?<!Start\\s)(?<!End\\s)(?:Cleared|Available|Avl|Ledger|Book|Current)\\s*\\.?\\s*Bal(?:ance)?[:\\s]*[A-Z\u20a6]{0,3}\\s*([\\d,]+\\.\\d{2})",
         "multiline": true,
         "sensitive": false,
         "singleline": true,
