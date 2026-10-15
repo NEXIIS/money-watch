@@ -4,3 +4,10 @@ dist
 repomix-output.xml
 supabase/.temp
 .playwright-mcp
+
+# Verification screenshots. Playwright writes a bare relative path to the repo
+# root rather than into .playwright-mcp, so name them without a directory and
+# they escape the ignore above.
+/*-smoke.png
+/*-banner.png
+onboarding-banner.png
