@@ -3,16 +3,30 @@ import { ArrowLeft, User, Mail, LogOut, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import type { Session } from '@supabase/supabase-js';
-import type { UserWallet } from '../types';
+import type { UserWallet, BankAccount, ReconcileResult } from '../types';
+import { BankAccountsPanel } from './BankAccountsPanel';
 
 interface SettingsViewProps {
   onClose: () => void;
   session: Session;
   wallet: UserWallet | null;
   onRefetch: () => void; // So we can tell App.tsx to reload the new username
+  bankAccounts: BankAccount[];
+  onAddBankAccount: (label: string, openingBalance: number, bankName?: string) => Promise<boolean>;
+  onRemoveBankAccount: (accountId: string) => Promise<boolean>;
+  onReconcileAccount: (accountId: string, reportedBalance: number) => Promise<ReconcileResult>;
 }
 
-export function SettingsView({ onClose, session, wallet, onRefetch }: SettingsViewProps) {
+export function SettingsView({
+  onClose,
+  session,
+  wallet,
+  onRefetch,
+  bankAccounts,
+  onAddBankAccount,
+  onRemoveBankAccount,
+  onReconcileAccount,
+}: SettingsViewProps) {
   const [username, setUsername] = useState(wallet?.username || '');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -98,6 +112,14 @@ export function SettingsView({ onClose, session, wallet, onRefetch }: SettingsVi
           </button>
         </div>
       </div>
+
+      {/* Bank Accounts */}
+      <BankAccountsPanel
+        accounts={bankAccounts}
+        onAdd={onAddBankAccount}
+        onRemove={onRemoveBankAccount}
+        onReconcile={onReconcileAccount}
+      />
 
       {/* Danger Zone */}
       <div className="pt-4">

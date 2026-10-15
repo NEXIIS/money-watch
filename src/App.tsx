@@ -39,7 +39,8 @@ export default function App() {
   const { 
     wallet, transactions, chartTransactions, activeSession, pastSessions, categories, loading, error,
     notifications, markAsRead,
-    moveToVault, withdrawFromVault, startSession, endSession, logExpense, deleteTransaction, editTransaction, refetch
+    moveToVault, withdrawFromVault, startSession, endSession, logExpense, deleteTransaction, editTransaction, refetch,
+    bankAccounts, addBankAccount, removeBankAccount, reconcileAccount
   } = useWallet(session?.user?.id);
 
   const availableBalance = wallet?.current_balance || 0;
@@ -76,8 +77,8 @@ export default function App() {
     }
   };
 
-  const handleLogExpense = async (description: string, amount: number, categoryId: string) => {
-    const success = await logExpense(description, amount, categoryId);
+  const handleLogExpense = async (description: string, amount: number, categoryId: string, accountId?: string) => {
+    const success = await logExpense(description, amount, categoryId, accountId);
     if (success) {
       toast.success('Expense logged successfully!');
       setShowExpenseModal(false);
@@ -162,7 +163,11 @@ export default function App() {
             onClose={() => setCurrentView('dashboard')} 
             session={session} 
             wallet={wallet} 
-            onRefetch={refetch} 
+            onRefetch={refetch}
+            bankAccounts={bankAccounts}
+            onAddBankAccount={addBankAccount}
+            onRemoveBankAccount={removeBankAccount}
+            onReconcileAccount={reconcileAccount}
           />
         ) : (
           <main className="space-y-4">
@@ -225,6 +230,7 @@ export default function App() {
        <LogExpenseModal
          onClose={() => setShowExpenseModal(false)}
          categories={categories}
+         bankAccounts={bankAccounts}
          onLogExpense={handleLogExpense}
          savingsBalance={wallet?.savings_balance || 0}
          currentBalance={availableBalance}

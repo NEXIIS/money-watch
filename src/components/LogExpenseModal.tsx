@@ -1,21 +1,28 @@
 import { useState, useEffect } from 'react';
-import { X, Receipt, DollarSign, Tag } from 'lucide-react';
+import { X, Receipt, DollarSign, Tag, Landmark } from 'lucide-react';
+import type { BankAccount } from '../types';
 
 interface LogExpenseModalProps {
   onClose: () => void;
-  onLogExpense: (description: string, amount: number, categoryId: string) => Promise<boolean>;
+  onLogExpense: (description: string, amount: number, categoryId: string, accountId?: string) => Promise<boolean>;
   currentBalance: number;
   savingsBalance: number;
   categories: { id: string; name: string; color: string }[]; // NEW PROP
+  bankAccounts?: BankAccount[];
 }
 
-export function LogExpenseModal({ onClose, onLogExpense, currentBalance, savingsBalance, categories }: LogExpenseModalProps) {
+export function LogExpenseModal({ onClose, onLogExpense, currentBalance, savingsBalance, categories, bankAccounts = [] }: LogExpenseModalProps) {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   // Default to the first custom category, or empty if none exist yet
   const [categoryId, setCategoryId] = useState(categories.length > 0 ? categories[0].id : ''); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // With one account the server attributes the expense automatically, so the
+  // picker is only needed once the choice is ambiguous.
+  const needsAccount = bankAccounts.length > 1;
+  const [accountId, setAccountId] = useState(bankAccounts.length === 1 ? bankAccounts[0].id : '');
 
   // Safety check: if categories load a split second after the modal opens
   useEffect(() => {
@@ -33,6 +40,11 @@ export function LogExpenseModal({ onClose, onLogExpense, currentBalance, savings
       return;
     }
 
+    if (needsAccount && !accountId) {
+      setError('Please select which account this was paid from');
+      return;
+    }
+
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       setError('Please enter a valid amount');
@@ -46,7 +58,14 @@ export function LogExpenseModal({ onClose, onLogExpense, currentBalance, savings
 
     setLoading(true);
     // Passing the actual ID instead of the text string
-    const success = await onLogExpense(description, parsedAmount, categoryId);
+    const success = await onLogExpense(
+      description,
+      parsedAmount,
+      categoryId,
+      // Undefined (not '') when there's a single account, so the server
+      // attributes it rather than being handed a blank string.
+      accountId || undefined
+    );
     
     if (success) {
       onClose();
@@ -88,6 +107,32 @@ export function LogExpenseModal({ onClose, onLogExpense, currentBalance, savings
               </select>
             </div>
           </div>
+
+          {/* Only shown when the choice is ambiguous. With zero or one account
+              the server attributes the expense itself, so a hidden-but-required
+              field would just be a confusing dead end. */}
+          {bankAccounts.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">
+                Paid from{needsAccount ? '' : ' (optional)'}
+              </label>
+              <div className="relative">
+                <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="w-full appearance-none rounded-2xl bg-slate-800 border border-slate-700 pl-11 pr-4 py-3.5 text-white focus:outline-none focus:border-red-500/50 transition cursor-pointer"
+                >
+                  {needsAccount && <option value="">Select an account...</option>}
+                  {bankAccounts.map((acct) => (
+                    <option key={acct.id} value={acct.id}>
+                      {acct.label} — ₦{acct.ledger_balance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* ... [Keep Description and Amount inputs exactly the same] ... */}
           <div>

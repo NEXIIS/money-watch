@@ -16,6 +16,7 @@ function tx(type: TransactionType, amount: number): Transaction {
     category: 'General',
     category_id: null,
     session_id: null,
+    account_id: null,
     linked_to: null,
     date: '2026-02-20T00:00:00Z',
     created_at: '2026-02-20T00:00:00Z',
@@ -67,6 +68,26 @@ describe('QuickStats bucketing', () => {
     // as spending; type-based bucketing must not.
     render(<QuickStats transactions={[tx('vault_deposit', -90000)]} />);
     expect(screen.getByText('Total Out').nextSibling).toHaveTextContent('₦0');
+  });
+
+  // A reconciliation is the bank correcting our figure. The money already
+  // existed and already changed hands, so counting it would double-report it
+  // as either income or spending. It is in neither INFLOW nor OUTFLOW_TYPES.
+  it('excludes reconciliation corrections from both totals', () => {
+    render(
+      <QuickStats
+        transactions={[tx('reconciliation', -4200), tx('reconciliation', 900), tx('deposit', 1111)]}
+      />
+    );
+
+    expect(screen.getByText('Total In').nextSibling).toHaveTextContent('₦1,111');
+    expect(screen.getByText('Total Out').nextSibling).toHaveTextContent('₦0');
+  });
+
+  // It is not a wallet shuffle either, so it must not be footnoted as one.
+  it('does not count a reconciliation as an internal transfer', () => {
+    render(<QuickStats transactions={[tx('reconciliation', -4200)]} />);
+    expect(screen.queryByText(/internal transfer/)).not.toBeInTheDocument();
   });
 
   it('counts vault_overdraft as neither inflow nor outflow', () => {

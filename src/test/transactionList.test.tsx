@@ -14,6 +14,7 @@ function tx(overrides: Partial<Transaction> & { type: TransactionType; amount: n
     category: 'General',
     category_id: null,
     session_id: null,
+    account_id: null,
     linked_to: null,
     date: '2020-01-15T00:00:00Z',
     created_at: '2020-01-15T00:00:00Z',
@@ -42,6 +43,25 @@ describe('TransactionList type bucketing', () => {
 
     expect(screen.getByText(/₦1,500\.00/)).toHaveTextContent('+');
     expect(screen.getByText(/₦200\.00/)).toHaveTextContent('-');
+    expect(screen.queryByText('internal')).not.toBeInTheDocument();
+  });
+
+  // A reconciliation corrects the ledger to match the bank. The money already
+  // existed, so it is neither income nor spending and must not be signed like
+  // a deposit or an expense.
+  it('renders a reconciliation neutrally, labelled as reconciled', () => {
+    render(
+      <TransactionList
+        transactions={[
+          tx({ type: 'reconciliation', amount: -4200, description: 'Reconciled with GTBank Current: -4200' }),
+        ]}
+      />
+    );
+
+    const amount = screen.getByText(/₦4,200\.00/);
+    expect(amount).not.toHaveTextContent('+');
+    expect(amount).not.toHaveTextContent('-');
+    expect(screen.getByText('reconciled')).toBeInTheDocument();
     expect(screen.queryByText('internal')).not.toBeInTheDocument();
   });
 });
@@ -105,6 +125,22 @@ describe('TransactionList edit/delete gating', () => {
     await userEvent.click(screen.getByTitle('View Details'));
     expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+  });
+
+  // The amount on a reconciliation is what the bank reported, so it must not be
+  // hand-editable. Delete is still offered, and the RPC fully reverses it.
+  it('offers delete but not edit for a reconciliation row', async () => {
+    render(
+      <TransactionList
+        transactions={[tx({ type: 'reconciliation', amount: -4200 })]}
+        onEditTransaction={onEdit}
+        onDeleteTransaction={onDelete}
+      />
+    );
+
+    await userEvent.click(screen.getByTitle('View Details'));
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
   });
 
   it('now offers edit for a bank-synced withdrawal', async () => {

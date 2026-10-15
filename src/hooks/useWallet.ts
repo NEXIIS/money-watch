@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import type { UserWallet, Transaction, ShoppingSession, Notification, UserCategory } from '../types';
+import type { UserWallet, Transaction, ShoppingSession, Notification, UserCategory, BankAccount, ReconcileResult } from '../types';
 import toast from 'react-hot-toast';
 
 export function useWallet(userId?: string) {
@@ -11,6 +11,7 @@ export function useWallet(userId?: string) {
   const [pastSessions, setPastSessions] = useState<ShoppingSession[]>([]);
   const [categories, setCategories] = useState<UserCategory[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,6 +148,128 @@ export function useWallet(userId?: string) {
     }
   }, [userId]);
 
+  const fetchBankAccounts = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setBankAccounts(data || []);
+    } catch (err: unknown) {
+      console.error("Error fetching bank accounts:", err instanceof Error ? err.message : String(err));
+    }
+  }, [userId]);
+
+  const addBankAccount = async (
+    label: string,
+    openingBalance: number,
+    bankName?: string
+  ): Promise<boolean> => {
+    if (!userId) return false;
+
+    try {
+      const { data, error } = await supabase.rpc('add_bank_account', {
+        p_label: label.trim(),
+        p_opening_balance: Math.abs(openingBalance),
+        p_bank_name: bankName?.trim() || null,
+      });
+
+      if (error) throw error;
+
+      // add_bank_account upserts, so it reports success even when it updated
+      // an existing label rather than creating one.
+      if (data?.success === false) {
+        toast.error(data.error || 'Could not add that account');
+        return false;
+      }
+
+      await fetchBankAccounts();
+      toast.success(`${label.trim()} added`);
+      return true;
+    } catch (err) {
+      console.error("Error adding bank account:", err);
+      toast.error(err instanceof Error ? err.message : 'Could not add that account');
+      return false;
+    }
+  };
+
+  const removeBankAccount = async (accountId: string): Promise<boolean> => {
+    if (!userId) return false;
+
+    try {
+      const { data, error } = await supabase.rpc('remove_bank_account', {
+        p_account_id: accountId,
+      });
+
+      if (error) throw error;
+      if (data?.success === false) {
+        toast.error(data.error || 'Could not remove that account');
+        return false;
+      }
+
+      await fetchBankAccounts();
+      // Transactions keep their history; only the account link is dropped.
+      toast.success('Account removed');
+      return true;
+    } catch (err) {
+      console.error("Error removing bank account:", err);
+      toast.error(err instanceof Error ? err.message : 'Could not remove that account');
+      return false;
+    }
+  };
+
+  /**
+   * Hand the bank a figure and let it correct the ledger.
+   *
+   * The bank is authoritative: if its number disagrees with ours, the ledger
+   * moves to match and a visible `reconciliation` transaction records exactly
+   * what changed. The savings vault is never involved.
+   */
+  const reconcileAccount = async (
+    accountId: string,
+    reportedBalance: number
+  ): Promise<ReconcileResult> => {
+    if (!userId) return { success: false, error: 'Not signed in' };
+
+    try {
+      const { data, error } = await supabase.rpc('reconcile_bank_account', {
+        p_account_id: accountId,
+        p_reported_balance: Math.abs(reportedBalance),
+      });
+
+      if (error) throw error;
+
+      const result = (data ?? { success: false, error: 'No response from server' }) as ReconcileResult;
+
+      if (!result.success) {
+        toast.error(result.error || 'Reconciliation failed');
+        return result;
+      }
+
+      await Promise.all([refreshLedger(), fetchBankAccounts()]);
+
+      if (result.reconciled && result.drift) {
+        const dir = result.drift > 0 ? '+' : '−';
+        toast(`Reconciled: ${dir}₦${Math.abs(result.drift).toLocaleString()}`, {
+          icon: '🏦',
+        });
+      } else {
+        toast.success('Already in sync');
+      }
+
+      return result;
+    } catch (err) {
+      console.error("Error reconciling account:", err);
+      toast.error(err instanceof Error ? err.message : 'Reconciliation failed');
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
   const markAsRead = async (id: string) => {
   setNotifications((prev) =>
     prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
@@ -190,14 +313,15 @@ export function useWallet(userId?: string) {
         fetchNotifications(),
         fetchActiveSession(), 
         fetchPastSessions(), 
-        fetchCategories()
+        fetchCategories(),
+        fetchBankAccounts()
       ]);
       
       setLoading(false); 
     };
     
     init();
-  }, [userId, fetchWallet, fetchTransactions, fetchChartTransactions, fetchActiveSession, fetchPastSessions, fetchCategories, fetchNotifications]);
+  }, [userId, fetchWallet, fetchTransactions, fetchChartTransactions, fetchActiveSession, fetchPastSessions, fetchCategories, fetchNotifications, fetchBankAccounts]);
 
   useEffect(() => {
     if (!userId) return;
@@ -244,6 +368,20 @@ export function useWallet(userId?: string) {
     };
   }, [userId, fetchTransactions, fetchWallet, fetchChartTransactions]);
 
+  /**
+   * Refresh everything that derives from the ledger.
+   *
+   * `transactions` is the 5-row recent list; `chartTransactions` is the 100-row
+   * slice QuickStats and ExpenseChart read. They are separate queries, so a
+   * mutation that refetched only the former left the totals and the chart
+   * showing pre-action figures until a full page reload. Every mutator that
+   * writes a transaction must go through here.
+   */
+  const refreshLedger = useCallback(
+    () => Promise.all([fetchWallet(), fetchTransactions(), fetchChartTransactions()]),
+    [fetchWallet, fetchTransactions, fetchChartTransactions]
+  );
+
   const moveToVault = async (amount: number): Promise<boolean> => {
     if (!userId) return false;
     const { data, error } = await supabase.rpc('move_to_vault', {
@@ -265,7 +403,7 @@ export function useWallet(userId?: string) {
       p_message: `You successfully saved ₦${amount.toLocaleString()} into your vault.`
     });
 
-    await Promise.all([fetchWallet(), fetchTransactions()]);
+    await refreshLedger();
     toast.success('Funds secured in Vault'); 
     return true;
   };
@@ -283,7 +421,7 @@ export function useWallet(userId?: string) {
       return false;
     }
 
-    await Promise.all([fetchWallet(), fetchTransactions()]);
+    await refreshLedger();
     toast.success(`₦${amount} withdrawn to main balance`);
     return true;
   };
@@ -341,7 +479,12 @@ export function useWallet(userId?: string) {
     }
   };
 
-  const logExpense = async (description: string, amount: number, categoryId: string): Promise<boolean> => {
+  const logExpense = async (
+    description: string,
+    amount: number,
+    categoryId: string,
+    accountId?: string
+  ): Promise<boolean> => {
     if (!userId) return false;
 
     try {
@@ -352,7 +495,10 @@ export function useWallet(userId?: string) {
         p_amount: expenseAmount,
         p_description: description,
         p_category_id: categoryId, 
-        p_session_id: activeSession?.id || null 
+        p_session_id: activeSession?.id || null,
+        // Omitted entirely when not chosen, so the server applies its own
+        // single-account default rather than receiving a blank uuid.
+        ...(accountId ? { p_account_id: accountId } : {})
       });
 
       if (error || !data?.success) {
@@ -360,7 +506,7 @@ export function useWallet(userId?: string) {
         return false;
       }
       
-      await Promise.all([fetchWallet(), fetchTransactions(), fetchActiveSession()]);
+      await Promise.all([refreshLedger(), fetchActiveSession()]);
       return true;
 
     } catch (err) {
@@ -384,7 +530,7 @@ export function useWallet(userId?: string) {
       }
 
       toast.success('Transaction deleted and refunded! ♻️');
-      await Promise.all([fetchWallet(), fetchTransactions(), fetchActiveSession()]);
+      await Promise.all([refreshLedger(), fetchActiveSession()]);
       return true;
 
     } catch (err: unknown) {
@@ -413,7 +559,7 @@ export function useWallet(userId?: string) {
       }
 
       toast.success('Transaction updated! ✏️');
-      await Promise.all([fetchWallet(), fetchTransactions(), fetchActiveSession()]);
+      await Promise.all([refreshLedger(), fetchActiveSession()]);
       return true;
 
     } catch (err: unknown) {
@@ -431,6 +577,7 @@ export function useWallet(userId?: string) {
     activeSession,
     pastSessions,
     categories,
+    bankAccounts,
     loading,
     error,
     notifications,
@@ -442,6 +589,9 @@ export function useWallet(userId?: string) {
     logExpense,
     deleteTransaction,
     editTransaction,
+    addBankAccount,
+    removeBankAccount,
+    reconcileAccount,
     refetch: () => {
       setError(null);
       return Promise.all([
@@ -452,6 +602,7 @@ export function useWallet(userId?: string) {
         fetchPastSessions(),
         fetchNotifications(),
         fetchCategories(),
+        fetchBankAccounts(),
       ]);
     },
   };

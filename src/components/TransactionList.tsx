@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, ShoppingCart, Info, X, Trash2, Edit2, Save } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, ShoppingCart, Info, X, Trash2, Edit2, Save, Landmark } from 'lucide-react';
 import type { Transaction, UserCategory } from '../types';
+import { INFLOW_TYPES, OUTFLOW_TYPES, NEUTRAL_TYPES } from '../types';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -112,9 +113,10 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
 
         <div className="divide-y divide-slate-700/30">
           {transactions.map((tx) => {
-            const isOutflow = ['expense', 'withdrawal'].includes(tx.type);
-            const isInflow = ['deposit'].includes(tx.type);
-            const isInternal = ['vault_deposit', 'vault_withdrawal', 'vault_overdraft', 'transfer'].includes(tx.type);
+            const isOutflow = OUTFLOW_TYPES.includes(tx.type);
+            const isInflow = INFLOW_TYPES.includes(tx.type);
+            const isReconciliation = tx.type === 'reconciliation';
+            const isInternal = NEUTRAL_TYPES.includes(tx.type);
             return (
               <div key={tx.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-700/20 transition-colors">
                 <div
@@ -138,7 +140,14 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
                   <div className="flex items-center gap-1.5">
                     {isInflow && <ArrowDownLeft size={14} className="text-emerald-400" />}
                     {isOutflow && <ArrowUpRight size={14} className="text-red-400" />}
-                    {isInternal && <span className="text-[10px] uppercase text-slate-500 tracking-wider">internal</span>}
+                    {isReconciliation ? (
+                      <span className="flex items-center gap-1 text-[10px] uppercase text-sky-400/90 tracking-wider">
+                        <Landmark size={11} />
+                        reconciled
+                      </span>
+                    ) : (
+                      isInternal && <span className="text-[10px] uppercase text-slate-500 tracking-wider">internal</span>
+                    )}
                     <span
                       className={`text-sm font-semibold tabular-nums ${
                         isInflow ? 'text-emerald-400' : isOutflow ? 'text-slate-200' : 'text-slate-400'
