@@ -47,6 +47,8 @@ export function Header({ name, onOpenSettings, notifications = [], markAsRead }:
         <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
+            aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+            aria-expanded={showDropdown}
             className="relative p-2 text-slate-400 hover:text-slate-300 transition"
           >
             <Bell className="w-5 h-5" />
@@ -111,6 +113,7 @@ export function Header({ name, onOpenSettings, notifications = [], markAsRead }:
 
         <button 
           onClick={onOpenSettings}
+          aria-label="Settings"
           className="p-2 bg-slate-800/50 hover:bg-slate-800 rounded-full text-slate-300 transition"
         >
          <Settings size={20} />

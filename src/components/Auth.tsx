@@ -12,27 +12,66 @@ export function Auth() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setMessage(null);
 
+    // Cheap client-side guards so obvious mistakes never hit the network.
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setMessage({ type: 'error', text: 'Enter a valid email address.' });
+      return;
+    }
+    // Supabase enforces this too, but a round trip is slow and the error is vague.
+    if (password.length < 6) {
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters.' });
+      return;
+    }
+    if (isSignUp && !username.trim()) {
+      setMessage({ type: 'error', text: 'Pick a username.' });
+      return;
+    }
+
+    setLoading(true);
+
     // If signing up, we attach the username to their metadata!
-    const { error } = isSignUp 
-      ? await supabase.auth.signUp({ 
-          email, 
+    const { data, error } = isSignUp
+      ? await supabase.auth.signUp({
+          email: trimmedEmail,
           password,
           options: {
             data: { username: username.trim() } // Save the custom username
           }
         })
-      : await supabase.auth.signInWithPassword({ email, password });
+      : await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
 
     if (error) {
-      setMessage({ type: 'error', text: error.message });
       setLoading(false);
-    } else if (isSignUp) {
-      setMessage({ type: 'success', text: 'Account created! Check your email to confirm, or try signing in if email confirmation is off.' });
-      setLoading(false);
+      // "already registered" is a dead end for this screen: signing in is the
+      // only way forward, so say so instead of echoing the raw GoTrue message.
+      if (/already (registered|exists)/i.test(error.message)) {
+        setMessage({
+          type: 'error',
+          text: 'That email already has an account. Switch to Sign in.',
+        });
+        setIsSignUp(false);
+      } else {
+        setMessage({ type: 'error', text: error.message });
+      }
+      return;
     }
+
+    // A returned session means the user is already authenticated. App's
+    // onAuthStateChange swaps the view for us, so don't paint a message that
+    // would flash on screen for a few frames. Only report the
+    // confirmation-required case, which is the one that needs the user to act.
+    if (isSignUp && !data.session) {
+      setMessage({
+        type: 'success',
+        text: 'Account created. Check your email for the confirmation link, then sign in.',
+      });
+    }
+
+    setLoading(false);
+    setPassword('');
   };
 
   return (
@@ -59,6 +98,7 @@ export function Auth() {
                   <input
                     type="text"
                     required={isSignUp}
+                    autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full rounded-2xl bg-slate-800 border border-slate-700 pl-11 pr-4 py-3.5 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition"
@@ -75,10 +115,11 @@ export function Auth() {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full rounded-2xl bg-slate-800 border border-slate-700 pl-11 pr-4 py-3.5 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition"
-                  placeholder="name@example.com"
+                  placeholder="you@gmail.com"
                 />
               </div>
             </div>
@@ -90,6 +131,8 @@ export function Auth() {
                 <input
                   type="password"
                   required
+                  minLength={6}
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-2xl bg-slate-800 border border-slate-700 pl-11 pr-4 py-3.5 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition"
