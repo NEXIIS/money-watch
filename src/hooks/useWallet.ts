@@ -46,8 +46,8 @@ export function useWallet(userId?: string) {
       } else {
         setWallet(data);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [userId]);
 
@@ -58,13 +58,13 @@ export function useWallet(userId?: string) {
         .from('transactions')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        .order('date', { ascending: false })
         .limit(5);
 
       if (error) throw error;
       setTransactions(data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [userId]);
 
@@ -75,13 +75,13 @@ export function useWallet(userId?: string) {
         .from('transactions')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        .order('date', { ascending: false })
         .limit(100);
 
       if (error) throw error;
       setChartTransactions(data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [userId]);
 
@@ -125,8 +125,8 @@ export function useWallet(userId?: string) {
 
       if (error) throw error;
       setCategories(data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [userId]);
 
@@ -142,8 +142,8 @@ export function useWallet(userId?: string) {
 
       if (error) throw error;
       if (data) setNotifications(data);
-    } catch (err: any) {
-      console.error("Error fetching notifications:", err.message);
+    } catch (err: unknown) {
+      console.error("Error fetching notifications:", err instanceof Error ? err.message : String(err));
     }
   }, [userId]);
 
@@ -160,9 +160,9 @@ export function useWallet(userId?: string) {
 
     if (error) throw error;
 
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  } catch (err: any) {
-    console.error("Failed to mark as read:", err.message);
+    // keep notification in list; optimistic state already shows is_read: true
+  } catch (err: unknown) {
+    console.error("Failed to mark as read:", err instanceof Error ? err.message : String(err));
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: false } : n))
     );
@@ -196,7 +196,7 @@ export function useWallet(userId?: string) {
     };
     
     init();
-  }, [userId, fetchWallet, fetchTransactions, fetchChartTransactions, fetchActiveSession, fetchPastSessions, fetchCategories, fetchNotifications]); // <-- FIXED: Removed () from fetchNotifications
+  }, [userId, fetchWallet, fetchTransactions, fetchChartTransactions, fetchActiveSession, fetchPastSessions, fetchCategories, fetchNotifications]);
 
   useEffect(() => {
     if (!userId) return;
@@ -256,7 +256,7 @@ export function useWallet(userId?: string) {
       return false;
     }
 
-    // --- NEW: Trigger Database Notification ---
+    // notify via database so the row also arrives over realtime
     await supabase.rpc('create_notification', {
       p_user_id: userId,
       p_type: 'vault',
@@ -332,8 +332,8 @@ export function useWallet(userId?: string) {
 
       if (error) throw error;
       setActiveSession(null);
-    } catch (err: any) {
-      console.error("Error ending session:", err.message);
+    } catch (err: unknown) {
+      console.error("Error ending session:", err instanceof Error ? err.message : String(err));
       toast.error("Failed to end session properly");
     }
   };
@@ -384,9 +384,10 @@ export function useWallet(userId?: string) {
       await Promise.all([fetchWallet(), fetchTransactions(), fetchActiveSession()]);
       return true;
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete transaction';
       console.error("Error deleting transaction:", err);
-      toast.error(err.message || 'Failed to delete transaction');
+      toast.error(msg);
       return false;
     }
   };
@@ -412,9 +413,10 @@ export function useWallet(userId?: string) {
       await Promise.all([fetchWallet(), fetchTransactions(), fetchActiveSession()]);
       return true;
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to edit transaction';
       console.error("Error editing transaction:", err);
-      toast.error(err.message || 'Failed to edit transaction');
+      toast.error(msg);
       return false;
     }
   };

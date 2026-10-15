@@ -1,20 +1,35 @@
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
-import type { Transaction } from '../types';
+import {
+  type Transaction,
+  OUTFLOW_TYPES,
+  INFLOW_TYPES,
+  INTERNAL_TRANSFER_TYPES,
+} from '../types';
 
 interface QuickStatsProps {
+  /**
+   * Must be the full ledger slice, not the 5-row recent list. These figures are
+   * totals, so they need every transaction in range.
+   */
   transactions: Transaction[];
 }
 
 export function QuickStats({ transactions }: QuickStatsProps) {
+  // Bucket by `type`, not by sign. The vault_* transfers are internal
+  // moves between wallets and must not be counted as spending.
   const totalIn = transactions
-    .filter((t) => t.amount > 0)
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => INFLOW_TYPES.includes(t.type))
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const totalOut = transactions
-    .filter((t) => t.amount < 0)
+    .filter((t) => OUTFLOW_TYPES.includes(t.type))
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const txCount = transactions.length;
+
+  const internalTransfers = transactions.filter((t) =>
+    INTERNAL_TRANSFER_TYPES.includes(t.type)
+  ).length;
 
   return (
     <div className="grid grid-cols-3 gap-3">
@@ -44,6 +59,11 @@ export function QuickStats({ transactions }: QuickStatsProps) {
         </div>
         <p className="text-xs text-slate-400 mb-0.5">Transactions</p>
         <p className="text-base font-bold text-slate-200 tabular-nums">{txCount}</p>
+        {internalTransfers > 0 && (
+          <p className="text-[10px] text-slate-500 mt-1">
+            {internalTransfers} internal transfer{internalTransfers === 1 ? '' : 's'} excluded
+          </p>
+        )}
       </div>
     </div>
   );

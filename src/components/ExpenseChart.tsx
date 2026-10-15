@@ -20,7 +20,11 @@ const FALLBACK_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', 
 
 export function ExpenseChart({ transactions, categories = [] }: ExpenseChartProps) {
   const chartData = useMemo(() => {
-    const expenses = transactions.filter(t => t.type === 'expense');
+    // Count real spending: both manually logged expenses and bank-synced
+    // withdrawals are outflows. Vault transfers are internal.
+    const expenses = transactions.filter(
+      (t) => t.type === 'expense' || t.type === 'withdrawal'
+    );
 
     const grouped = expenses.reduce((acc, curr) => {
       // 1. Find the matching category using the new category_id
@@ -78,7 +82,7 @@ export function ExpenseChart({ transactions, categories = [] }: ExpenseChartProp
               ))}
             </Pie>
             <Tooltip 
-              formatter={(value: any) => `₦${Number(value || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}
+              formatter={(value) => `₦${Number(value || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`}
               contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
               itemStyle={{ color: '#fff' }}
             />

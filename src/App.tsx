@@ -38,7 +38,7 @@ export default function App() {
 
   const { 
     wallet, transactions, chartTransactions, activeSession, pastSessions, categories, loading, error,
-    notifications, markAsRead, // <-- FIXED: Added these from your hook!
+    notifications, markAsRead,
     moveToVault, withdrawFromVault, startSession, endSession, logExpense, deleteTransaction, editTransaction, refetch
   } = useWallet(session?.user?.id);
 
@@ -195,7 +195,7 @@ export default function App() {
               onWithdrawFromVault={withdrawFromVault} 
             />
 
-            <QuickStats transactions={transactions} />
+            <QuickStats transactions={chartTransactions} />
 
             <TransactionList 
               transactions={transactions.slice(0, 5)} 
