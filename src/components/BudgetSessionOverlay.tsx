@@ -11,15 +11,9 @@ interface BudgetSessionOverlayProps {
 
 export function BudgetSessionOverlay({ session, onEnd, onLogExpenseClick }: BudgetSessionOverlayProps) {
   const [pulse, setPulse] = useState(false);
-  
-  // FIXED: Add the ? and || 0 so it doesn't crash if session is null
   const [prevSpent, setPrevSpent] = useState(session?.current_spent || 0);
   const [confirmEnd, setConfirmEnd] = useState(false);
 
-  // FIXED: Add this safety bounce right here!
-  if (!session) return null;
-
-  // CHANGED: spent_amount to current_spent (defaulting to 0 just to be safe!)
   const safeSpentAmount = session.current_spent || 0;
   const remaining = session.budget_limit - safeSpentAmount;
   const spentPercent = Math.min((safeSpentAmount / session.budget_limit) * 100, 100);
@@ -27,7 +21,7 @@ export function BudgetSessionOverlay({ session, onEnd, onLogExpenseClick }: Budg
   const isWarning = spentPercent > 75 && !isOverBudget;
 
   useEffect(() => {
-    // CHANGED: current_spent to spent_amount
+    // pulse the ring when the spent amount changes (e.g. realtime update)
     if (safeSpentAmount !== prevSpent) {
       setPrevSpent(safeSpentAmount);
       setPulse(true);
@@ -35,6 +29,8 @@ export function BudgetSessionOverlay({ session, onEnd, onLogExpenseClick }: Budg
       return () => clearTimeout(timer);
     }
   }, [safeSpentAmount, prevSpent]);
+
+  if (!session) return null;
 
   const ringColor = isOverBudget
     ? 'border-red-500'
@@ -202,7 +198,6 @@ export function BudgetSessionOverlay({ session, onEnd, onLogExpenseClick }: Budg
             </div>
             <h3 className="text-lg font-bold text-white text-center mb-1">End Session?</h3>
             <p className="text-sm text-slate-400 text-center mb-6">
-              {/* CHANGED: current_spent to spent_amount */}
               You spent ₦{safeSpentAmount.toFixed(2)} of your ₦{session.budget_limit.toFixed(2)} budget.
             </p>
             <div className="flex gap-3">

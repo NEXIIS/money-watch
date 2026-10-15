@@ -180,7 +180,8 @@ export function useWallet(userId?: string) {
     }
 
     const init = async () => {
-      setLoading(true); 
+      setLoading(true);
+      setError(null);
       
       await Promise.all([
         fetchWallet(), 
@@ -321,8 +322,8 @@ export function useWallet(userId?: string) {
     }
   };
 
-  const endSession = async (): Promise<void> => {
-    if (!activeSession || !userId) return;
+  const endSession = async (): Promise<boolean> => {
+    if (!activeSession || !userId) return false;
 
     try {
       const { error } = await supabase
@@ -332,9 +333,11 @@ export function useWallet(userId?: string) {
 
       if (error) throw error;
       setActiveSession(null);
+      return true;
     } catch (err: unknown) {
       console.error("Error ending session:", err instanceof Error ? err.message : String(err));
       toast.error("Failed to end session properly");
+      return false;
     }
   };
 
@@ -439,14 +442,17 @@ export function useWallet(userId?: string) {
     logExpense,
     deleteTransaction,
     editTransaction,
-    refetch: () => Promise.all([
-      fetchWallet(),
-      fetchTransactions(),
-      fetchChartTransactions(),
-      fetchActiveSession(),
-      fetchPastSessions(),
-      fetchNotifications(),
-      fetchCategories(),
-]),
+    refetch: () => {
+      setError(null);
+      return Promise.all([
+        fetchWallet(),
+        fetchTransactions(),
+        fetchChartTransactions(),
+        fetchActiveSession(),
+        fetchPastSessions(),
+        fetchNotifications(),
+        fetchCategories(),
+      ]);
+    },
   };
 }

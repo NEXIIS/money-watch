@@ -69,6 +69,12 @@ export interface Transaction {
   category: string;
   category_id: string | null;
   session_id: string | null;
+  /**
+   * A `vault_overdraft` row points at the `expense` it covered. Lets edits and
+   * deletes hand the vault's share back to `savings_balance`. NULL on
+   * everything else, and on overdraft rows that predate the column.
+   */
+  linked_to: string | null;
   /** Business date. Backfilled imports write this, not `created_at`. */
   date: string;
   created_at: string;

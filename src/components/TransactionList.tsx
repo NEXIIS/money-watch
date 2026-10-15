@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, ShoppingCart, Info, X, Trash2, Edit2, Save } from 'lucide-react';
-import type { Transaction } from '../types';
+import type { Transaction, UserCategory } from '../types';
 
 interface TransactionListProps {
   transactions: Transaction[];
   onDeleteTransaction?: (id: string) => Promise<boolean>;
   onEditTransaction?: (id: string, amount: number, desc: string, category: string) => Promise<boolean>;
+  categories?: UserCategory[];
 }
 
 function formatDate(dateStr: string): string {
@@ -44,7 +45,7 @@ function getCategoryIcon(description: string) {
   return '💳';
 }
 
-export function TransactionList({ transactions, onDeleteTransaction, onEditTransaction }: TransactionListProps) {
+export function TransactionList({ transactions, onDeleteTransaction, onEditTransaction, categories = [] }: TransactionListProps) {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -62,10 +63,9 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
       return;
     }
 
-    // THE FIX: If it's an expense, make sure it stays a negative number in the database!
-    const finalAmount = selectedTx.type === 'expense' ? -Math.abs(amountNum) : Math.abs(amountNum);
-
-    const success = await onEditTransaction(selectedTx.id, finalAmount, editDesc, editCategory);
+    // The RPC normalises the sign from the transaction type, so send the
+    // magnitude and let the database decide the polarity.
+    const success = await onEditTransaction(selectedTx.id, amountNum, editDesc, editCategory);
     if (success) {
       setIsEditing(false);
       setSelectedTx(null);
@@ -112,13 +112,17 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
 
         <div className="divide-y divide-slate-700/30">
           {transactions.map((tx) => {
-            const isCredit = tx.amount > 0;
+            const isOutflow = ['expense', 'withdrawal'].includes(tx.type);
+            const isInflow = ['deposit'].includes(tx.type);
+            const isInternal = ['vault_deposit', 'vault_withdrawal', 'vault_overdraft', 'transfer'].includes(tx.type);
             return (
               <div key={tx.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-700/20 transition-colors">
                 <div
                   className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl text-base ${
-                    isCredit
+                    isInflow
                       ? 'bg-emerald-500/10 border border-emerald-500/20'
+                      : isOutflow
+                      ? 'bg-red-500/10 border border-red-500/20'
                       : 'bg-slate-700/60 border border-slate-600/30'
                   }`}
                 >
@@ -127,23 +131,20 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{tx.description}</p>
-                  <p className="text-xs text-slate-400">{formatDate(tx.created_at)}</p>
+                  <p className="text-xs text-slate-400">{formatDate(tx.date || tx.created_at)}</p>
                 </div>
 
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <div className="flex items-center gap-1.5">
-                    {isCredit ? (
-                      <ArrowDownLeft size={14} className="text-emerald-400" />
-                    ) : (
-                      <ArrowUpRight size={14} className="text-red-400" />
-                    )}
+                    {isInflow && <ArrowDownLeft size={14} className="text-emerald-400" />}
+                    {isOutflow && <ArrowUpRight size={14} className="text-red-400" />}
+                    {isInternal && <span className="text-[10px] uppercase text-slate-500 tracking-wider">internal</span>}
                     <span
                       className={`text-sm font-semibold tabular-nums ${
-                        isCredit ? 'text-emerald-400' : 'text-slate-200'
+                        isInflow ? 'text-emerald-400' : isOutflow ? 'text-slate-200' : 'text-slate-400'
                       }`}
                     >
-                      {isCredit ? '+' : ''}
-                      {tx.amount < 0 ? '-' : ''}₦
+                      {isInflow ? '+' : isOutflow ? '-' : ''}₦
                       {Math.abs(tx.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -183,6 +184,17 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
                   <label className="text-xs text-slate-400 mb-1 block">Amount (₦)</label>
                   <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-blue-500" />
                 </div>
+                {categories.length > 0 && (
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Category</label>
+                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-blue-500">
+                      <option value="">Uncategorized</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <button onClick={handleSaveEdit} className="w-full flex items-center justify-center gap-2 rounded-2xl bg-blue-500/10 border border-blue-500/20 py-3 text-sm font-semibold text-blue-400 hover:bg-blue-500/20 transition">
                   <Save size={16} /> Save Changes
                 </button>
@@ -194,18 +206,26 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
                     {getCategoryIcon(selectedTx.description)}
                   </div>
                   <h2 className="text-xl font-bold text-white">{selectedTx.description}</h2>
-                  <p className={`text-3xl font-bold mt-2 ${selectedTx.amount > 0 ? 'text-emerald-400' : 'text-slate-200'}`}>
-                    {selectedTx.amount > 0 ? '+' : ''}{selectedTx.amount < 0 ? '-' : ''}₦{Math.abs(selectedTx.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                  <p className={`text-3xl font-bold mt-2 ${
+                    selectedTx.type === 'deposit' ? 'text-emerald-400' :
+                    ['expense', 'withdrawal'].includes(selectedTx.type) ? 'text-slate-200' : 'text-slate-400'
+                  }`}>
+                    {selectedTx.type === 'deposit' ? '+' : ['expense', 'withdrawal'].includes(selectedTx.type) ? '-' : ''}₦{Math.abs(selectedTx.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
 
-                {selectedTx.type === 'expense' && (
+                {/* Overdraft rows are the vault's half of an expense: deleting the
+                    expense handles them. Internal transfers can't be edited
+                    because editing them would move the row's amount without
+                    moving either wallet. */}
+                {selectedTx.type !== 'vault_overdraft' && (
                   <div className="flex gap-2 mb-6">
-                    {onEditTransaction && (
-                      <button onClick={startEditing} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-800 border border-slate-700 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition">
-                        <Edit2 size={16} /> Edit
-                      </button>
-                    )}
+                    {onEditTransaction &&
+                      ['expense', 'withdrawal', 'deposit'].includes(selectedTx.type) && (
+                        <button onClick={startEditing} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-800 border border-slate-700 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition">
+                          <Edit2 size={16} /> Edit
+                        </button>
+                      )}
                     {onDeleteTransaction && (
                       <button onClick={handleDelete} disabled={isDeleting} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500/10 border border-red-500/20 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition disabled:opacity-50">
                         <Trash2 size={16} /> {isDeleting ? '...' : 'Delete'}
@@ -221,7 +241,7 @@ export function TransactionList({ transactions, onDeleteTransaction, onEditTrans
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Exact Time</span>
-                    <span className="text-white font-medium">{formatExactTime(selectedTx.created_at)}</span>
+                    <span className="text-white font-medium">{formatExactTime(selectedTx.date || selectedTx.created_at)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Type</span>

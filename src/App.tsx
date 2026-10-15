@@ -68,26 +68,22 @@ export default function App() {
   };
 
   const handleEndSession = async () => {
-    try {
-      await endSession();
+    const ok = await endSession();
+    if (ok) {
       toast.success('Session ended! Great job tracking your spending. 🛑');
       setShowOverlay(false);
       await refetch();
-    } catch (err) {
-      console.error("Error in handleEndSession:", err);
     }
   };
 
   const handleLogExpense = async (description: string, amount: number, categoryId: string) => {
-    const success = await logExpense(description, amount, categoryId); 
+    const success = await logExpense(description, amount, categoryId);
     if (success) {
       toast.success('Expense logged successfully!');
+      setShowExpenseModal(false);
     } else {
       toast.error('Failed to log expense');
     }
-    setShowExpenseModal(false);
-    await refetch(); 
-
     return success;
   };
 
@@ -199,6 +195,7 @@ export default function App() {
 
             <TransactionList 
               transactions={transactions.slice(0, 5)} 
+              categories={categories}
               onDeleteTransaction={deleteTransaction} 
               onEditTransaction={editTransaction} 
             />

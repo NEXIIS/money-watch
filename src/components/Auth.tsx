@@ -6,7 +6,7 @@ export function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState(''); // NEW STATE
+  const [username, setUsername] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
@@ -42,7 +42,7 @@ export function Auth() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-600 shadow-2xl shadow-blue-600/20">
             <Lock size={32} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Welcome to FinTrack</h1>
+          <h1 className="text-2xl font-bold text-white">Welcome to Money-Watch</h1>
           <p className="text-slate-400 text-sm mt-2">
             {isSignUp ? 'Create your secure account' : 'Sign in to manage your vault'}
           </p>
@@ -51,7 +51,6 @@ export function Auth() {
         <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-xl shadow-xl">
           <form onSubmit={handleAuth} className="space-y-5">
             
-            {/* NEW: ONLY SHOW USERNAME IF SIGNING UP */}
             {isSignUp && (
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Username</label>
